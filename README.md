@@ -6,6 +6,8 @@ Requires the following board support package in Arduino IDE (Tools -> Board -> B
 DOT Correction can be set for each channel individually.
 Animation doesn't work as PROGMEM snippets for ESP32 were not finished.
 
+The corresponding pinout can be found in the `pinouts` directory.
+
 # Tlc5940 Library
 
 16 channel PWM LED driver based on the Texas Instruments TLC5940 chip.
