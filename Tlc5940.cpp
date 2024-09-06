@@ -22,7 +22,6 @@
 #include "Tlc5940.h"
 #include "pinouts/pin_functions.h"
 
-
 int sin_pin;
 int sout_pin;
 int sclk_pin;
@@ -65,8 +64,7 @@ uint8_t tlc_DCData[NUM_TLCS * 12];
 static uint8_t firstGSInput;
 
 /** Interrupt called after an XLAT pulse to prevent more XLAT pulses. */
-static inline void Tlc5940_interrupt(void)
-{
+static inline void Tlc5940_interrupt(void) {
     disable_XLAT_pulses();
     clear_XLAT_interrupt();
     tlc_needXLAT = 0;
@@ -77,57 +75,53 @@ static inline void Tlc5940_interrupt(void)
 }
 
 #if defined(__AVR__)
-ISR(TIMER1_OVF_vect)
-{
+ISR(TIMER1_OVF_vect) {
     Tlc5940_interrupt();
 }
 
 #elif defined(__arm__) && defined(TEENSYDUINO)
 #if defined(__IMXRT1062__)
-void flexpwm42_isr(void)
-{
+void flexpwm42_isr(void) {
     FLEXPWM4_SM2STS = FLEXPWM_SMSTS_RF;
     Tlc5940_interrupt();
 }
 #else
-void ftm1_isr(void)
-{
+void ftm1_isr(void) {
     uint32_t sc = FTM1_SC;
-    if (sc & 0x80) FTM1_SC = sc & 0x7F;
+    if (sc & 0x80)
+        FTM1_SC = sc & 0x7F;
     Tlc5940_interrupt();
 }
 #endif
 
-#elif defined (ARDUINO_ARCH_ESP32)
+#elif defined(ARDUINO_ARCH_ESP32)
 portMUX_TYPE TLC5940_timerMux = portMUX_INITIALIZER_UNLOCKED;
 // volatile int TLC5940_xlat_enabled = 0;
 // volatile int TLC5940_interrupt_enabled = 0;
 
-void IRAM_ATTR TLC5940_onTimer()
-{
-	portENTER_CRITICAL_ISR(&TLC5940_timerMux);
-	int xlat_enabled = Tlc.TLC5940_xlat_enabled;
-	int interrupt_enabled = Tlc.TLC5940_interrupt_enabled;
-	portEXIT_CRITICAL_ISR(&TLC5940_timerMux);
-	
-	// BLANK, XLAT
-	set_pin(blank_pin);
-	if (xlat_enabled)
-	{
-		set_pin(xlat_pin);
-		clear_pin(xlat_pin);
-	}
-	clear_pin(blank_pin);
-	
-	if (interrupt_enabled)
-		Tlc5940_interrupt();
+void IRAM_ATTR TLC5940_onTimer() {
+    portENTER_CRITICAL_ISR(&TLC5940_timerMux);
+    int xlat_enabled = Tlc.TLC5940_xlat_enabled;
+    int interrupt_enabled = Tlc.TLC5940_interrupt_enabled;
+    portEXIT_CRITICAL_ISR(&TLC5940_timerMux);
+
+    // BLANK, XLAT
+    set_pin(blank_pin);
+    if (xlat_enabled) {
+        set_pin(xlat_pin);
+        clear_pin(xlat_pin);
+    }
+    clear_pin(blank_pin);
+
+    if (interrupt_enabled)
+        Tlc5940_interrupt();
 }
 #endif
 
-#if defined (ARDUINO_ARCH_ESP32)
+#if defined(ARDUINO_ARCH_ESP32)
 // SPI to send gray-scale data
 const uint32_t TLC5940_SPI_CLK = 8000000;  // 8MHz
-SPIClass* TLC5940_vspi = NULL;
+SPIClass *TLC5940_vspi = NULL;
 #endif
 
 /** \defgroup ReqVPRG_ENABLED Functions that Require VPRG_ENABLED
@@ -150,51 +144,49 @@ SPIClass* TLC5940_vspi = NULL;
     zeros, or whatever initialValue is set to and the Timers will start.
     \param initialValue = 0, optional parameter specifing the inital startup
            value */
-void Tlc5940::init(	uint16_t initialValue, int sin, int sout, int sclk, int xlat, int blank, int gsclk, int vprg, int xerr )
-{
+void Tlc5940::init(uint16_t initialValue, int sin, int sout, int sclk, int xlat, int blank, int gsclk, int vprg,
+                   int xerr) {
     /* Pin Setup */
-#if defined (ARDUINO_ARCH_ESP32)
-	sin_pin = sin;
-	sout_pin = sout;
-	sclk_pin = sclk;
-	xlat_pin = xlat;
-	blank_pin = blank;
-	gsclk_pin = gsclk;
-	vprg_pin = vprg;
-	xerr_pin = xerr;
-	
-	output_pin(xlat_pin);   
-	output_pin(blank_pin);   
-	clear_pin(xlat_pin);
-	set_pin(blank_pin);  // start with BLANK
- #if VPRG_ENABLED	
-	if (vprg_pin >= 0)
-	{
-		output_pin(vprg_pin);
-		clear_pin(vprg_pin);   // LOW: GS-reg, HIGH: DC-reg
-	}
- #endif
- #if XERR_ENABLED
-	if (xerr_pin >= 0)
-	{
-		pullup_pin(xerr_pin);
-	}
- #endif	
-	set_pin(blank_pin); // leave blank high (until the timers start)
-#elif	
+#if defined(ARDUINO_ARCH_ESP32)
+    sin_pin = sin;
+    sout_pin = sout;
+    sclk_pin = sclk;
+    xlat_pin = xlat;
+    blank_pin = blank;
+    gsclk_pin = gsclk;
+    vprg_pin = vprg;
+    xerr_pin = xerr;
+
+    output_pin(xlat_pin);
+    output_pin(blank_pin);
+    clear_pin(xlat_pin);
+    set_pin(blank_pin);  // start with BLANK
+#if VPRG_ENABLED
+    if (vprg_pin >= 0) {
+        output_pin(vprg_pin);
+        clear_pin(vprg_pin);  // LOW: GS-reg, HIGH: DC-reg
+    }
+#endif
+#if XERR_ENABLED
+    if (xerr_pin >= 0) {
+        pullup_pin(xerr_pin);
+    }
+#endif
+    set_pin(blank_pin);  // leave blank high (until the timers start)
+#elif
     output_pin(XLAT_DDR, XLAT_PIN);
     output_pin(BLANK_DDR, BLANK_PIN);
     output_pin(GSCLK_DDR, GSCLK_PIN);
-	
- #if VPRG_ENABLED
+
+#if VPRG_ENABLED
     output_pin(VPRG_DDR, VPRG_PIN);
     clear_pin(VPRG_PORT, VPRG_PIN);  // grayscale mode (VPRG low)
- #endif
- #if XERR_ENABLED
-    pullup_pin(XERR_DDR, XERR_PORT, XERR_PIN); // XERR as input, enable pull-up resistor
- #endif
- 
-	set_pin(BLANK_PORT, BLANK_PIN); // leave blank high (until the timers start)
+#endif
+#if XERR_ENABLED
+    pullup_pin(XERR_DDR, XERR_PORT, XERR_PIN);  // XERR as input, enable pull-up resistor
+#endif
+
+    set_pin(BLANK_PORT, BLANK_PIN);  // leave blank high (until the timers start)
 #endif
 
     tlc_shift8_init();
@@ -204,63 +196,62 @@ void Tlc5940::init(	uint16_t initialValue, int sin, int sout, int sclk, int xlat
     disable_XLAT_pulses();
     clear_XLAT_interrupt();
     tlc_needXLAT = 0;
-#if defined (ARDUINO_ARCH_ESP32)
-	pulse_pin(xlat_pin);
+#if defined(ARDUINO_ARCH_ESP32)
+    pulse_pin(xlat_pin);
 #elif
-	pulse_pin(XLAT_PORT, XLAT_PIN);
+    pulse_pin(XLAT_PORT, XLAT_PIN);
 #endif
-
 
     /* Timer Setup */
 #if defined(__AVR__)
     /* Timer 1 - BLANK / XLAT */
-    TCCR1A = _BV(COM1B1);  // non inverting, output on OC1B, BLANK
-    TCCR1B = _BV(WGM13);   // Phase/freq correct PWM, ICR1 top
-    OCR1A = 1;             // duty factor on OC1A, XLAT is inside BLANK
-    OCR1B = 2;             // duty factor on BLANK (larger than OCR1A (XLAT))
-    ICR1 = TLC_PWM_PERIOD; // see tlc_config.h
+    TCCR1A = _BV(COM1B1);   // non inverting, output on OC1B, BLANK
+    TCCR1B = _BV(WGM13);    // Phase/freq correct PWM, ICR1 top
+    OCR1A = 1;              // duty factor on OC1A, XLAT is inside BLANK
+    OCR1B = 2;              // duty factor on BLANK (larger than OCR1A (XLAT))
+    ICR1 = TLC_PWM_PERIOD;  // see tlc_config.h
 
     /* Timer 2 - GSCLK */
 #if defined(TLC_ATMEGA_8_H)
-    TCCR2  = _BV(COM20)       // set on BOTTOM, clear on OCR2A (non-inverting),
-           | _BV(WGM21);      // output on OC2B, CTC mode with OCR2 top
-    OCR2   = TLC_GSCLK_PERIOD / 2; // see tlc_config.h
-    TCCR2 |= _BV(CS20);       // no prescale, (start pwm output)
+    TCCR2 = _BV(COM20)            // set on BOTTOM, clear on OCR2A (non-inverting),
+            | _BV(WGM21);         // output on OC2B, CTC mode with OCR2 top
+    OCR2 = TLC_GSCLK_PERIOD / 2;  // see tlc_config.h
+    TCCR2 |= _BV(CS20);           // no prescale, (start pwm output)
 #elif defined(TLC_TIMER3_GSCLK)
     TCCR3A = _BV(COM3A1)      // set on BOTTOM, clear on OCR3A (non-inverting),
                               // output on OC3A
-           | _BV(WGM31);      // Fast pwm with ICR3 top
+             | _BV(WGM31);    // Fast pwm with ICR3 top
     OCR3A = 0;                // duty factor (as short a pulse as possible)
     ICR3 = TLC_GSCLK_PERIOD;  // see tlc_config.h
     TCCR3B = _BV(CS30)        // no prescale, (start pwm output)
-           | _BV(WGM32)       // Fast pwm with ICR3 top
-           | _BV(WGM33);      // Fast pwm with ICR3 top
+             | _BV(WGM32)     // Fast pwm with ICR3 top
+             | _BV(WGM33);    // Fast pwm with ICR3 top
 #else
-    TCCR2A = _BV(COM2B1)      // set on BOTTOM, clear on OCR2A (non-inverting),
-                              // output on OC2B
-           | _BV(WGM21)       // Fast pwm with OCR2A top
-           | _BV(WGM20);      // Fast pwm with OCR2A top
-    TCCR2B = _BV(WGM22);      // Fast pwm with OCR2A top
-    OCR2B = 0;                // duty factor (as short a pulse as possible)
-    OCR2A = TLC_GSCLK_PERIOD; // see tlc_config.h
-    TCCR2B |= _BV(CS20);      // no prescale, (start pwm output)
+    TCCR2A = _BV(COM2B1)       // set on BOTTOM, clear on OCR2A (non-inverting),
+                               // output on OC2B
+             | _BV(WGM21)      // Fast pwm with OCR2A top
+             | _BV(WGM20);     // Fast pwm with OCR2A top
+    TCCR2B = _BV(WGM22);       // Fast pwm with OCR2A top
+    OCR2B = 0;                 // duty factor (as short a pulse as possible)
+    OCR2A = TLC_GSCLK_PERIOD;  // see tlc_config.h
+    TCCR2B |= _BV(CS20);       // no prescale, (start pwm output)
 #endif
-    TCCR1B |= _BV(CS10);      // no prescale, (start pwm output)
+    TCCR1B |= _BV(CS10);  // no prescale, (start pwm output)
 
 #elif defined(__arm__) && defined(TEENSYDUINO)
- #if defined(__IMXRT1062__)
+#if defined(__IMXRT1062__)
     /* Teensy 4.0, 4.1, MicroMod */
     clear_pin(XLAT_DDR, XLAT_PIN);
     analogWriteFrequency(5, 4000000);
     analogWrite(5, 128);
     const uint32_t newdiv = (uint32_t)((float)F_BUS_ACTUAL / 4 / 1000 + 0.5f);
     FLEXPWM4_MCTRL |= FLEXPWM_MCTRL_CLDOK(4);
-    FLEXPWM4_SM2CTRL = FLEXPWM_SMCTRL_FULL | FLEXPWM_SMCTRL_PRSC(2); // 3146
+    FLEXPWM4_SM2CTRL = FLEXPWM_SMCTRL_FULL | FLEXPWM_SMCTRL_PRSC(2);  // 3146
     FLEXPWM4_SM2VAL0 = newdiv - 1;
     FLEXPWM4_SM2VAL1 = newdiv - 1;
-    FLEXPWM4_SM2VAL2 = newdiv - 7; // pin 2 = FlexPWM4_2_A = BLANK
+    FLEXPWM4_SM2VAL2 = newdiv - 7;  // pin 2 = FlexPWM4_2_A = BLANK
     FLEXPWM4_SM2VAL3 = newdiv - 1;
-    FLEXPWM4_SM2VAL4 = newdiv - 6; // pin 3 = FlexPWM4_2_B = XLAT
+    FLEXPWM4_SM2VAL4 = newdiv - 6;  // pin 3 = FlexPWM4_2_B = XLAT
     FLEXPWM4_SM2VAL5 = newdiv - 2;
     FLEXPWM4_OUTEN = FLEXPWM_OUTEN_PWMA_EN(4) | FLEXPWM_OUTEN_PWMB_EN(4);
     FLEXPWM4_MCTRL |= FLEXPWM_MCTRL_LDOK(4);
@@ -271,7 +262,7 @@ void Tlc5940::init(	uint16_t initialValue, int sin, int sout, int sclk, int xlat
     FLEXPWM4_SM2STS = 0x3FFF;
     attachInterruptVector(IRQ_FLEXPWM4_2, flexpwm42_isr);
     NVIC_ENABLE_IRQ(IRQ_FLEXPWM4_2);
- #else
+#else
     /* Teensy 3.0, 3.1, 3.2, 3.5, 3.6 */
     clear_pin(XLAT_DDR, XLAT_PIN);
     SIM_SCGC4 |= SIM_SCGC4_CMT;
@@ -285,7 +276,7 @@ void Tlc5940::init(	uint16_t initialValue, int sin, int sout, int sclk, int xlat
     CMT_CMD4 = 0;
     CMT_OC = 0x60;
     CMT_MSC = 0x01;
-    CORE_PIN5_CONFIG = PORT_PCR_MUX(2)|PORT_PCR_DSE|PORT_PCR_SRE;
+    CORE_PIN5_CONFIG = PORT_PCR_MUX(2) | PORT_PCR_DSE | PORT_PCR_SRE;
     FTM1_SC = 0;
     FTM1_MOD = TLC_TIMER_TEENSY3_NORMAL_MOD;
     FTM1_CNT = 0;
@@ -295,30 +286,27 @@ void Tlc5940::init(	uint16_t initialValue, int sin, int sout, int sclk, int xlat
     FTM1_C1V = TLC_TIMER_TEENSY3_NORMAL_MOD - TLC_TIMER_TEENSY3_NORMAL_CV - 1;
     FTM1_SC = FTM_SC_CLKS(1) | FTM_SC_CPWMS;
     NVIC_ENABLE_IRQ(IRQ_FTM1);
-    CORE_PIN4_CONFIG = PORT_PCR_MUX(3)|PORT_PCR_DSE|PORT_PCR_SRE;
- #endif
- 
+    CORE_PIN4_CONFIG = PORT_PCR_MUX(3) | PORT_PCR_DSE | PORT_PCR_SRE;
+#endif
+
 #elif defined(ARDUINO_ARCH_ESP32)
-	const uint8_t  TIMER_NUM = 0;     // hardware timer number
-	const uint16_t TIMER_DIV = 80;    // timer divider to make 1MHz from 80MHz
-	const uint64_t TIMER_ALM = 2050;  // interrupt every 2.050ms 
-	hw_timer_t* TLC5940_timer = NULL;
-	
-	// start timer
-	TLC5940_timer = timerBegin(TIMER_NUM, TIMER_DIV, true); // increment mode
-	timerAttachInterrupt(TLC5940_timer, &TLC5940_onTimer, true);    // edge mode
-	timerAlarmWrite(TLC5940_timer, TIMER_ALM, true); 		// auto-reload mode
-	timerAlarmEnable(TLC5940_timer);
-	
-	// LEDC for GS(Gray-scale) clock
-	const uint8_t  TLC5940_LEDC_CHN = 0;    // LEDC channel
-	const double   TLC5940_LEDC_FRQ = 2e6;  // LEDC frequency 2MHz
-	const uint8_t  TLC5940_LEDC_RSL = 5;    // LEDC resolution 5bit = 32
-	const uint32_t TLC5940_LEDC_DTY = 8;    // LEDC duty 25% .. 8 / 32
-	
-	ledcSetup(TLC5940_LEDC_CHN, TLC5940_LEDC_FRQ, TLC5940_LEDC_RSL);
-	ledcAttachPin(gsclk_pin, TLC5940_LEDC_CHN);
-	ledcWrite(TLC5940_LEDC_CHN, TLC5940_LEDC_DTY);
+    const uint32_t TIMER_FREQ = 1 * 1000 * 1000;  //  1MHz
+    const uint64_t TIMER_ALM = 2050;              // interrupt every 2.050ms
+    hw_timer_t *TLC5940_timer = NULL;
+
+    // start timer
+    TLC5940_timer = timerBegin(TIMER_FREQ);
+    timerAttachInterrupt(TLC5940_timer, &TLC5940_onTimer);
+    timerAlarm(TLC5940_timer, TIMER_ALM, true, 0);  // auto-reload mode
+
+    // LEDC for GS(Gray-scale) clock
+    const uint8_t TLC5940_LEDC_CHN = 0;   // LEDC channel
+    const double TLC5940_LEDC_FRQ = 2e6;  // LEDC frequency 2MHz
+    const uint8_t TLC5940_LEDC_RSL = 5;   // LEDC resolution 5bit = 32
+    const uint32_t TLC5940_LEDC_DTY = 8;  // LEDC duty 25% .. 8 / 32
+
+    ledcAttachChannel(gsclk_pin, TLC5940_LEDC_FRQ, TLC5940_LEDC_RSL, TLC5940_LEDC_CHN);
+    ledcWrite(TLC5940_LEDC_CHN, TLC5940_LEDC_DTY);
 #endif
     update();
 }
@@ -326,8 +314,7 @@ void Tlc5940::init(	uint16_t initialValue, int sin, int sout, int sclk, int xlat
 /** Clears the grayscale data array, #tlc_GSData, but does not shift in any
     data.  This call should be followed by update() if you are turning off
     all the outputs. */
-void Tlc5940::clear(void)
-{
+void Tlc5940::clear(void) {
     setAll(0);
 }
 
@@ -340,8 +327,7 @@ void Tlc5940::clear(void)
     \code while(tlc_needXLAT); \endcode
     \returns 1 if there is data waiting to be latched, 0 if data was
              successfully shifted in */
-uint8_t Tlc5940::update(void)
-{
+uint8_t Tlc5940::update(void) {
     if (tlc_needXLAT) {
         return 1;
     }
@@ -350,11 +336,11 @@ uint8_t Tlc5940::update(void)
         // adds an extra SCLK pulse unless we've just set dot-correction data
         firstGSInput = 0;
     } else {
-#if defined (ARDUINO_ARCH_ESP32)
-		TLC5940_vspi->end();	// Release SCLK pin
-		output_pin(sclk_pin);
-		pulse_pin(sclk_pin);
-		TLC5940_vspi->begin(sclk_pin, sout_pin, sin_pin, -1);
+#if defined(ARDUINO_ARCH_ESP32)
+        TLC5940_vspi->end();  // Release SCLK pin
+        output_pin(sclk_pin);
+        pulse_pin(sclk_pin);
+        TLC5940_vspi->begin(sclk_pin, sout_pin, sin_pin, -1);
 #elif
         pulse_pin(SCLK_PORT, SCLK_PIN);
 #endif
@@ -376,19 +362,18 @@ uint8_t Tlc5940::update(void)
            channel 0, OUT0 of the next TLC is channel 16, etc.
     \param value (0-4095).  The grayscale value, 4095 is maximum.
     \see get */
-void Tlc5940::set(TLC_CHANNEL_TYPE channel, uint16_t value)
-{
+void Tlc5940::set(TLC_CHANNEL_TYPE channel, uint16_t value) {
     TLC_CHANNEL_TYPE index8 = (NUM_TLCS * 16 - 1) - channel;
     uint8_t *index12p = tlc_GSData + ((((uint16_t)index8) * 3) >> 1);
-    if (index8 & 1) { // starts in the middle
-                      // first 4 bits intact | 4 top bits of value
+    if (index8 & 1) {  // starts in the middle
+                       // first 4 bits intact | 4 top bits of value
         *index12p = (*index12p & 0xF0) | (value >> 8);
-                      // 8 lower bits of value
+        // 8 lower bits of value
         *(++index12p) = value & 0xFF;
-    } else { // starts clean
-                      // 8 upper bits of value
+    } else {  // starts clean
+              // 8 upper bits of value
         *(index12p++) = value >> 4;
-                      // 4 lower bits of value | last 4 bits intact
+        // 4 lower bits of value | last 4 bits intact
         *index12p = ((uint8_t)(value << 4)) | (*index12p & 0xF);
     }
 }
@@ -398,23 +383,21 @@ void Tlc5940::set(TLC_CHANNEL_TYPE channel, uint16_t value)
            channel 0, OUT0 of the next TLC is channel 16, etc.
     \returns current grayscale value (0 - 4095) for channel
     \see set */
-uint16_t Tlc5940::get(TLC_CHANNEL_TYPE channel)
-{
+uint16_t Tlc5940::get(TLC_CHANNEL_TYPE channel) {
     TLC_CHANNEL_TYPE index8 = (NUM_TLCS * 16 - 1) - channel;
     uint8_t *index12p = tlc_GSData + ((((uint16_t)index8) * 3) >> 1);
-    return (index8 & 1)? // starts in the middle
-            (((uint16_t)(*index12p & 15)) << 8) | // upper 4 bits
-            *(index12p + 1)                       // lower 8 bits
-        : // starts clean
-            (((uint16_t)(*index12p)) << 4) | // upper 8 bits
-            ((*(index12p + 1) & 0xF0) >> 4); // lower 4 bits
+    return (index8 & 1) ?                             // starts in the middle
+               (((uint16_t)(*index12p & 15)) << 8) |  // upper 4 bits
+                   *(index12p + 1)                    // lower 8 bits
+                        :                             // starts clean
+               (((uint16_t)(*index12p)) << 4) |       // upper 8 bits
+                   ((*(index12p + 1) & 0xF0) >> 4);   // lower 4 bits
     // that's probably the ugliest ternary operator I've ever created.
 }
 
 /** Sets all channels to value.
     \param value grayscale value (0 - 4095) */
-void Tlc5940::setAll(uint16_t value)
-{
+void Tlc5940::setAll(uint16_t value) {
     uint8_t firstByte = value >> 4;
     uint8_t secondByte = (value << 4) | (value >> 8);
     uint8_t *p = tlc_GSData;
@@ -427,19 +410,16 @@ void Tlc5940::setAll(uint16_t value)
 
 #if VPRG_ENABLED
 
-static inline uint8_t byte_mask(uint8_t bit_ofs, uint8_t bit_num)
-{
-	uint8_t result = 0;
-	uint8_t num = bit_num;
-	for (uint8_t i = 0; i < 8; i++)
-	{
-		if (i >= bit_ofs && num)
-		{
-			result |= (uint8_t)(1 << i);
-			num--;
-		}
-	}
-	return result;
+static inline uint8_t byte_mask(uint8_t bit_ofs, uint8_t bit_num) {
+    uint8_t result = 0;
+    uint8_t num = bit_num;
+    for (uint8_t i = 0; i < 8; i++) {
+        if (i >= bit_ofs && num) {
+            result |= (uint8_t)(1 << i);
+            num--;
+        }
+    }
+    return result;
 }
 
 /** \addtogroup ReqVPRG_ENABLED
@@ -450,8 +430,7 @@ static inline uint8_t byte_mask(uint8_t bit_ofs, uint8_t bit_num)
 
 /** Shifts in the data from the DOT Correction data array, #tlc_DCData.
  */
-void Tlc5940::updateDC(void)
-{
+void Tlc5940::updateDC(void) {
     tlc_dcModeStart();
 
     uint8_t *p = tlc_DCData;
@@ -460,10 +439,10 @@ void Tlc5940::updateDC(void)
         tlc_shift8(*p++);
         tlc_shift8(*p++);
     }
-	
-	// dot correction data latch
-#if defined (ARDUINO_ARCH_ESP32)
-	pulse_pin(xlat_pin); 
+
+    // dot correction data latch
+#if defined(ARDUINO_ARCH_ESP32)
+    pulse_pin(xlat_pin);
 #elif
     pulse_pin(XLAT_PORT, XLAT_PIN);
 #endif
@@ -476,16 +455,15 @@ void Tlc5940::updateDC(void)
            channel 0, OUT0 of the next TLC is channel 16, etc.
     \param value (0-63).  The DOT Correction value, 63 is maximum.
     \see get */
-void Tlc5940::setDC(TLC_CHANNEL_TYPE channel, uint8_t value)
-{
+void Tlc5940::setDC(TLC_CHANNEL_TYPE channel, uint8_t value) {
     TLC_CHANNEL_TYPE index8 = (NUM_TLCS * 16 - 1) - channel;
     uint8_t *index6p = tlc_DCData + ((((uint16_t)index8) * 3) >> 2);
-	int8_t offset = ((((uint16_t)index8) * 3) % 4) * 2;
-	
-	value &= 0x3F;
-	
-	*index6p = (*index6p & ~byte_mask(offset, min(8 - offset, 6))) | (value << offset);
-	*(index6p+1) = (*(index6p+1) & ~byte_mask(0, max(offset - 2, 0))) | (value >> min(8 - offset, 6));
+    int8_t offset = ((((uint16_t)index8) * 3) % 4) * 2;
+
+    value &= 0x3F;
+
+    *index6p = (*index6p & ~byte_mask(offset, min(8 - offset, 6))) | (value << offset);
+    *(index6p + 1) = (*(index6p + 1) & ~byte_mask(0, max(offset - 2, 0))) | (value >> min(8 - offset, 6));
 }
 
 /** Gets the current DOT Correction value for a channel
@@ -493,15 +471,14 @@ void Tlc5940::setDC(TLC_CHANNEL_TYPE channel, uint8_t value)
            channel 0, OUT0 of the next TLC is channel 16, etc.
     \returns current DOT Correction value (0 - 63) for channel
     \see set */
-uint8_t Tlc5940::getDC(TLC_CHANNEL_TYPE channel)
-{
+uint8_t Tlc5940::getDC(TLC_CHANNEL_TYPE channel) {
     TLC_CHANNEL_TYPE index8 = (NUM_TLCS * 16 - 1) - channel;
     uint8_t *index6p = tlc_DCData + ((((uint16_t)index8) * 3) >> 2);
-	int8_t offset = ((((uint16_t)index8) * 3) % 4) * 2;
-	uint8_t result = 0;
-	
-	result |= (*index6p & byte_mask(offset, min(8 - offset, 6))) >> offset;
-	result |= (*(index6p+1) & byte_mask(0, max(offset - 2, 0))) << min(8 - offset, 6);
+    int8_t offset = ((((uint16_t)index8) * 3) % 4) * 2;
+    uint8_t result = 0;
+
+    result |= (*index6p & byte_mask(offset, min(8 - offset, 6))) >> offset;
+    result |= (*(index6p + 1) & byte_mask(0, max(offset - 2, 0))) << min(8 - offset, 6);
 
     return result;
 }
@@ -514,13 +491,12 @@ uint8_t Tlc5940::getDC(TLC_CHANNEL_TYPE channel)
          \frac{39.06}{R_{IREF}} \f$
     - DCn is the dot correction value for channel n
     \param value (0-63) */
-void Tlc5940::setAllDC(uint8_t value)
-{
+void Tlc5940::setAllDC(uint8_t value) {
     uint8_t firstByte = value << 2 | value >> 4;
     uint8_t secondByte = value << 4 | value >> 2;
     uint8_t thirdByte = value << 6 | value;
-	uint8_t *p = tlc_DCData;
-	while (p < tlc_DCData + NUM_TLCS * 12) {
+    uint8_t *p = tlc_DCData;
+    while (p < tlc_DCData + NUM_TLCS * 12) {
         *p++ = firstByte;
         *p++ = secondByte;
         *p++ = thirdByte;
@@ -535,12 +511,11 @@ void Tlc5940::setAllDC(uint8_t value)
 
 /** Checks for shorted/broken LEDs reported by any of the TLCs.
     \returns 1 if a TLC is reporting an error, 0 otherwise. */
-uint8_t Tlc5940::readXERR(void)
-{
-#if defined (ARDUINO_ARCH_ESP32)
-		return (digitalRead(xerr_pin) == LOW);
+uint8_t Tlc5940::readXERR(void) {
+#if defined(ARDUINO_ARCH_ESP32)
+    return (digitalRead(xerr_pin) == LOW);
 #elif
-        return ((XERR_PINS & _BV(XERR_PIN)) == 0);
+    return ((XERR_PINS & _BV(XERR_PIN)) == 0);
 #endif
 }
 
@@ -548,30 +523,26 @@ uint8_t Tlc5940::readXERR(void)
 
 /* @} */
 
-#if defined (ARDUINO_ARCH_ESP32)
-void Tlc5940::XLAT_mode(int val)
-{
-	TLC5940_xlat_enabled = val;
+#if defined(ARDUINO_ARCH_ESP32)
+void Tlc5940::XLAT_mode(int val) {
+    TLC5940_xlat_enabled = val;
 }
-void Tlc5940::INT_mode(int val)
-{
-	TLC5940_interrupt_enabled = val;
+void Tlc5940::INT_mode(int val) {
+    TLC5940_interrupt_enabled = val;
 }
 #endif
 
 #if DATA_TRANSFER_MODE == TLC_BITBANG
 
 /** Sets all the bit-bang pins to output */
-void tlc_shift8_init(void)
-{
-    output_pin(SIN_DDR, SIN_PIN);   // SIN as output
-    output_pin(SCLK_DDR, SCLK_PIN); // SCLK as output
+void tlc_shift8_init(void) {
+    output_pin(SIN_DDR, SIN_PIN);    // SIN as output
+    output_pin(SCLK_DDR, SCLK_PIN);  // SCLK as output
     clear_pin(SCLK_PORT, SCLK_PIN);
 }
 
 /** Shifts a byte out, MSB first */
-void tlc_shift8(uint8_t byte)
-{
+void tlc_shift8(uint8_t byte) {
     for (uint8_t bit = 0x80; bit; bit >>= 1) {
         if (bit & byte) {
             set_pin(SIN_PORT, SIN_PIN);
@@ -584,74 +555,66 @@ void tlc_shift8(uint8_t byte)
 
 #elif DATA_TRANSFER_MODE == TLC_SPI
 
- #if defined (ARDUINO_ARCH_ESP32)
- 
+#if defined(ARDUINO_ARCH_ESP32)
+
 /** Initializes the SPI module */
 
-void tlc_shift8_init(void)
-{
-	TLC5940_vspi = new SPIClass(VSPI);
-	TLC5940_vspi->begin(sclk_pin, sout_pin, sin_pin, -1);
+void tlc_shift8_init(void) {
+    TLC5940_vspi = new SPIClass(VSPI);
+    TLC5940_vspi->begin(sclk_pin, sout_pin, sin_pin, -1);
 }
 
 /** Shifts out a byte, MSB first */
-void tlc_shift8(uint8_t byte)
-{
+void tlc_shift8(uint8_t byte) {
     TLC5940_vspi->beginTransaction(SPISettings(TLC5940_SPI_CLK, MSBFIRST, SPI_MODE0));
-	TLC5940_vspi->transfer(byte);
-	TLC5940_vspi->endTransaction();
+    TLC5940_vspi->transfer(byte);
+    TLC5940_vspi->endTransaction();
 }
 
- #elif
-
+#elif
 
 /** Initializes the SPI module to double speed (f_osc / 2) */
-void tlc_shift8_init(void)
-{
-    output_pin(SIN_DDR, SIN_PIN);       // SPI MOSI as output
-    output_pin(SCLK_DDR, SCLK_PIN);     // SPI SCK as output
-    output_pin(TLC_SS_DDR, TLC_SS_PIN); // SPI SS as output
+void tlc_shift8_init(void) {
+    output_pin(SIN_DDR, SIN_PIN);        // SPI MOSI as output
+    output_pin(SCLK_DDR, SCLK_PIN);      // SPI SCK as output
+    output_pin(TLC_SS_DDR, TLC_SS_PIN);  // SPI SS as output
 
     clear_pin(SCLK_PORT, SCLK_PIN);
 
-    SPSR = _BV(SPI2X); // double speed (f_osc / 2)
-    SPCR = _BV(SPE)    // enable SPI
-         | _BV(MSTR);  // master mode
+    SPSR = _BV(SPI2X);   // double speed (f_osc / 2)
+    SPCR = _BV(SPE)      // enable SPI
+           | _BV(MSTR);  // master mode
 }
 
 /** Shifts out a byte, MSB first */
-void tlc_shift8(uint8_t byte)
-{
-    SPDR = byte; // starts transmission
+void tlc_shift8(uint8_t byte) {
+    SPDR = byte;  // starts transmission
     while (!(SPSR & _BV(SPIF)))
-        ; // wait for transmission complete
+        ;  // wait for transmission complete
 }
- #endif
+#endif
 #endif
 
 #if VPRG_ENABLED
 
 /** Switches to dot correction mode and clears any waiting grayscale latches.*/
-void tlc_dcModeStart(void)
-{
-    disable_XLAT_pulses(); // ensure that no latches happen
-    clear_XLAT_interrupt(); // (in case this was called right after update)
+void tlc_dcModeStart(void) {
+    disable_XLAT_pulses();   // ensure that no latches happen
+    clear_XLAT_interrupt();  // (in case this was called right after update)
     tlc_needXLAT = 0;
-#if defined (ARDUINO_ARCH_ESP32)
-		set_pin(vprg_pin); // dot correction mode
+#if defined(ARDUINO_ARCH_ESP32)
+    set_pin(vprg_pin);  // dot correction mode
 #elif
-        set_pin(VPRG_PORT, VPRG_PIN); // dot correction mode
+    set_pin(VPRG_PORT, VPRG_PIN);  // dot correction mode
 #endif
-    
 }
 
 /** Switches back to grayscale mode. */
-void tlc_dcModeStop(void)
-{
-#if defined (ARDUINO_ARCH_ESP32)
-		clear_pin(vprg_pin); // back to grayscale mode
+void tlc_dcModeStop(void) {
+#if defined(ARDUINO_ARCH_ESP32)
+    clear_pin(vprg_pin);  // back to grayscale mode
 #elif
-        clear_pin(VPRG_PORT, VPRG_PIN); // back to grayscale mode
+    clear_pin(VPRG_PORT, VPRG_PIN);  // back to grayscale mode
 #endif
     firstGSInput = 1;
 }
@@ -726,8 +689,8 @@ Tlc5940 Tlc;
 #ifndef TLC_MY_CRAZY_FUNCTIONS_H
 #define TLC_MY_CRAZY_FUNCTIONS_H
 
-#include "tlc_config.h"
 #include "Tlc5940.h"
+#include "tlc_config.h"
 
 void tlc_goCrazy(void);
 
@@ -781,4 +744,3 @@ tlc_goCrazy();
     You should have received a copy of the GNU General Public License
     along with The Arduino TLC5940 Library.  If not, see
     <http://www.gnu.org/licenses/>. */
-
