@@ -299,16 +299,14 @@ void Tlc5940::init(	uint16_t initialValue, int sin, int sout, int sclk, int xlat
  #endif
  
 #elif defined(ARDUINO_ARCH_ESP32)
-	const uint8_t  TIMER_NUM = 0;     // hardware timer number
-	const uint16_t TIMER_DIV = 80;    // timer divider to make 1MHz from 80MHz
-	const uint64_t TIMER_ALM = 2050;  // interrupt every 2.050ms 
+	const uint32_t TIMER_FRQ = 1000000; // 1MHz timer tick (matches former divider=80)
+	const uint64_t TIMER_ALM = 2050;    // interrupt every 2.050ms 
 	hw_timer_t* TLC5940_timer = NULL;
 	
 	// start timer
-	TLC5940_timer = timerBegin(TIMER_NUM, TIMER_DIV, true); // increment mode
-	timerAttachInterrupt(TLC5940_timer, &TLC5940_onTimer, true);    // edge mode
-	timerAlarmWrite(TLC5940_timer, TIMER_ALM, true); 		// auto-reload mode
-	timerAlarmEnable(TLC5940_timer);
+	TLC5940_timer = timerBegin(TIMER_FRQ);
+	timerAttachInterrupt(TLC5940_timer, &TLC5940_onTimer);
+	timerAlarm(TLC5940_timer, TIMER_ALM, true, 0);
 	
 	// LEDC for GS(Gray-scale) clock
 	const uint8_t  TLC5940_LEDC_CHN = 0;    // LEDC channel
@@ -316,9 +314,8 @@ void Tlc5940::init(	uint16_t initialValue, int sin, int sout, int sclk, int xlat
 	const uint8_t  TLC5940_LEDC_RSL = 5;    // LEDC resolution 5bit = 32
 	const uint32_t TLC5940_LEDC_DTY = 8;    // LEDC duty 25% .. 8 / 32
 	
-	ledcSetup(TLC5940_LEDC_CHN, TLC5940_LEDC_FRQ, TLC5940_LEDC_RSL);
-	ledcAttachPin(gsclk_pin, TLC5940_LEDC_CHN);
-	ledcWrite(TLC5940_LEDC_CHN, TLC5940_LEDC_DTY);
+	ledcAttachChannel(gsclk_pin, TLC5940_LEDC_FRQ, TLC5940_LEDC_RSL, TLC5940_LEDC_CHN);
+	ledcWriteChannel(TLC5940_LEDC_CHN, TLC5940_LEDC_DTY);
 #endif
     update();
 }
@@ -781,4 +778,3 @@ tlc_goCrazy();
     You should have received a copy of the GNU General Public License
     along with The Arduino TLC5940 Library.  If not, see
     <http://www.gnu.org/licenses/>. */
-
